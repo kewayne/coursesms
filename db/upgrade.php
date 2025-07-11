@@ -23,16 +23,19 @@
  */
 
 /**
- * The main function that is called when the plugin is being upgraded.
+ * Performs the upgrade for this plugin.
  *
  * @param int $oldversion The currently installed version of the plugin.
  * @return bool
  */
 function xmldb_local_coursessms_upgrade($oldversion) {
     global $DB;
-    $dbman = $DB->get_manager();
 
-    // In case of future upgrades, logic would be added here.
+    // Example upgrade step: mark new version as installed.
+    if ($oldversion < 2025071100) {
+        // No schema change, just savepoint.
+        upgrade_plugin_savepoint(true, 2025071100, 'local', 'coursessms');
+    }
 
     return true;
 }

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="local/coursessms/db" VERSION="20250710" COMMENT="XMLDB file for Moodle local/coursessms"
+<xmldb PATH="local/coursessms/db" VERSION="20250710" COMMENT="XMLDB file for Moodle local/coursessms"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
@@ -10,7 +10,7 @@
         <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="ID of the course from which the SMS was sent."/>
         <FIELD NAME="senderid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="ID of the user who sent the SMS."/>
         <FIELD NAME="messagecontent" TYPE="text" NOTNULL="true" COMMENT="The content of the SMS message."/>
-        <FIELD NAME="targettype" TYPE="char" LENGTH="50" NOTNULL="true" COMMENT="The type of target (role, group, cohort)."/>
+        <FIELD NAME="targettype" TYPE="varchar" LENGTH="50" NOTNULL="true" COMMENT="The type of target (role, group, cohort)."/>
         <FIELD NAME="targetid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="The ID of the role, group, or cohort targeted."/>
         <FIELD NAME="success_userids" TYPE="text" NOTNULL="false" COMMENT="JSON encoded array of user IDs SMS was sent to."/>
         <FIELD NAME="failed_userids" TYPE="text" NOTNULL="false" COMMENT="JSON encoded array of user IDs that had no phone number."/>
@@ -23,4 +23,4 @@
       </KEYS>
     </TABLE>
   </TABLES>
-</XMLDB>
+</xmldb>

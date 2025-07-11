@@ -1,9 +1,24 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * Moodle form for sending an SMS.
  *
  * @package   local_coursessms
- * @copyright 2025 Me
+ * @copyright 2025 Kewayne Davidson <admin.kewayne.com>
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -11,39 +26,45 @@ namespace local_coursessms\form;
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once($CFG->libdir . '/formslib.php');
+use moodleform;
+use html_writer;
 
-class send_form extends \moodleform {
+global $CFG;
+require_once($CFG->libdir . '/formslib.php');
+require_once($CFG->libdir . '/accesslib.php'); // Required for get_assignable_roles.
+
+/**
+ * Form for sending SMS messages in a course.
+ *
+ * @package   local_coursessms
+ * @copyright 2025 Kewayne Davidson <admin@kewayne.com>
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+class send_form extends moodleform {
 
     /**
      * Form definition.
      */
     protected function definition() {
-        global $DB;
+        global $DB, $USER;
         $mform = $this->_form;
         $courseid = $this->_customdata['courseid'];
         $context = \context_course::instance($courseid);
 
-        // --- Recipient Selection ---
+        // Recipient Selection.
         $mform->addElement('header', 'target_header', get_string('target_heading', 'local_coursessms'));
 
         $targetoptions = [
-            'all' => get_string('target_all', 'local_coursessms'),
-            'role' => get_string('target_role', 'local_coursessms'),
+            'all'   => get_string('target_all', 'local_coursessms'),
+            'role'  => get_string('target_role', 'local_coursessms'),
             'group' => get_string('target_group', 'local_coursessms'),
-            'cohort' => get_string('target_cohort', 'local_coursessms'),
+            // Cohort removed.
         ];
         $mform->addElement('select', 'targettype', get_string('target_type', 'local_coursessms'), $targetoptions);
         $mform->addHelpButton('targettype', 'target_heading', 'local_coursessms');
 
         // Role selector.
-        $roles = get_definable_roles($context, 'moodle/course:view', true);
-        $roleoptions = [];
-        if (!empty($roles)) {
-            foreach ($roles as $role) {
-                $roleoptions[$role->id] = role_get_name($role, $context);
-            }
-        }
+        $roleoptions = \get_assignable_roles($context);
         $mform->addElement('select', 'roleid', get_string('select_role', 'local_coursessms'), $roleoptions);
         $mform->hideIf('roleid', 'targettype', 'neq', 'role');
         $mform->disabledIf('roleid', 'targettype', 'neq', 'role');
@@ -60,37 +81,33 @@ class send_form extends \moodleform {
         $mform->hideIf('groupid', 'targettype', 'neq', 'group');
         $mform->disabledIf('groupid', 'targettype', 'neq', 'group');
 
-
-        // Cohort selector.
-        $cohorts = $DB->get_records_sql("
-            SELECT c.id, c.name
-            FROM {cohort} c
-            JOIN {cohort_members} cm ON cm.cohortid = c.id
-            JOIN {user_enrolments} ue ON ue.userid = cm.userid
-            JOIN {enrol} e ON e.id = ue.enrolid
-            WHERE e.courseid = ? AND c.contextid != ?
-            GROUP BY c.id, c.name
-            ORDER BY c.name ASC
-        ", [$courseid, \context_system::instance()->id]);
-        $cohortoptions = [];
-        if (!empty($cohorts)) {
-            foreach ($cohorts as $cohort) {
-                $cohortoptions[$cohort->id] = $cohort->name;
-            }
-        }
-        $mform->addElement('select', 'cohortid', get_string('select_cohort', 'local_coursessms'), $cohortoptions);
-        $mform->hideIf('cohortid', 'targettype', 'neq', 'cohort');
-        $mform->disabledIf('cohortid', 'targettype', 'neq', 'cohort');
-
-        // --- Message Content ---
+        // Message Content.
         $mform->addElement('header', 'message_header', get_string('message_heading', 'local_coursessms'));
-        $mform->addElement('textarea', 'messagecontent', get_string('message_content', 'local_coursessms'), 'wrap="virtual" rows="5" cols="50"');
-        $mform->addHelpButton('messagecontent', 'message_content', 'local_coursessms');
-        $mform->addRule('messagecontent', null, 'required', null, 'client');
-        $mform->setType('messagecontent', PARAM_TEXT);
 
-        // Add a character counter.
-        $mform->addElement('static', 'charcount', '', get_string('character_count', 'local_coursessms', 0));
+        // Prepare default message with sender signature and course shortname.
+        $courseshortname = $DB->get_field('course', 'shortname', ['id' => $courseid]);
+        $sendername = fullname($USER);
+        $defaultmessage = "\n--\n{$sendername}\n{$courseshortname}";
+
+        // Placeholder info text for the textarea.
+        $placeholderinfo = get_string('placeholder_info', 'local_coursessms');
+
+        $mform->addElement('textarea', 'messagecontent', get_string('message_content', 'local_coursessms'),
+            ['wrap' => 'virtual', 'rows' => 7, 'cols' => 50, 'placeholder' => $placeholderinfo]
+        );
+
+        $mform->setDefault('messagecontent', $defaultmessage);
+        $mform->setType('messagecontent', PARAM_TEXT);
+        $mform->addRule('messagecontent', null, 'required', null, 'client');
+        $mform->addHelpButton('messagecontent', 'message_content', 'local_coursessms');
+
+        // Help text below textarea informing about placeholders.
+        $mform->addElement('static', 'placeholder_help', '',
+            html_writer::tag('div', $placeholderinfo, [
+                'class' => 'placeholder-help',
+                'style' => 'font-style: italic; font-size: 0.9em; margin-top: 0.5em;',
+            ])
+        );
 
         // Hidden field for course ID.
         $mform->addElement('hidden', 'id', $courseid);
@@ -115,9 +132,7 @@ class send_form extends \moodleform {
         if ($data['targettype'] === 'group' && empty($data['groupid'])) {
             $errors['groupid'] = get_string('error_no_target', 'local_coursessms');
         }
-        if ($data['targettype'] === 'cohort' && empty($data['cohortid'])) {
-            $errors['cohortid'] = get_string('error_no_target', 'local_coursessms');
-        }
+        // Cohort validation removed.
 
         return $errors;
     }

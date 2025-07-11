@@ -31,33 +31,32 @@ $context = context_course::instance($course->id);
 
 require_login($course);
 require_capability('local/coursessms:sendsms', $context);
-// Check if any SMS gateways are enabled.
-$smsmanager = \core\di::get(\core_sms\manager::class);
-$enabledgateways = $smsmanager->get_enabled_gateway_instances();
-if (empty($enabledgateways)) {
-    throw new \moodle_exception('error_no_gateway', 'local_coursessms');
-}
 
 // Set up the page.
 $PAGE->set_url('/local/coursessms/index.php', ['id' => $courseid]);
+$PAGE->set_context($context);
 $PAGE->set_title(get_string('sendsms_page_title', 'local_coursessms'));
 $PAGE->set_heading($course->fullname);
-$PAGE->set_context($context);
 $PAGE->navbar->add(get_string('pluginname', 'local_coursessms'));
 
-// Form instance.
-$form = new \local_coursessms\form\send_form(
-    new moodle_url('/local/coursessms/send_action.php'),
-    ['courseid' => $courseid]
-);
-
-// Handle cancel action.
-if ($form->is_cancelled()) {
-    redirect(new moodle_url('/course/view.php', ['id' => $courseid]));
-}
+// Check if any SMS gateways are enabled.
+$smsmanager = \core\di::get(\core_sms\manager::class);
+$enabledgateways = $smsmanager->get_enabled_gateway_instances();
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('sendsms_page_title', 'local_coursessms'));
+
+// If no gateways are enabled, show a soft warning and setup button.
+if (empty($enabledgateways)) {
+    $setupurl = new moodle_url('https://academy.juniordavidson.com/sms/sms_gateways.php');
+    $message = get_string('nogateway_enabled_message', 'local_coursessms', $setupurl->out());
+    echo $OUTPUT->notification($message, \core\output\notification::NOTIFY_WARNING);
+    echo html_writer::start_div('mt-3');
+    echo $OUTPUT->single_button($setupurl, get_string('setup_gateway_button', 'local_coursessms'), 'get');
+    echo html_writer::end_div();
+    echo $OUTPUT->footer();
+    exit;
+}
 
 // Display navigation tabs.
 $tabrows = [];
@@ -81,6 +80,17 @@ if (has_capability('local/coursessms:viewlog', $context)) {
 $tabrows[] = $row;
 
 print_tabs($tabrows, 'sendsms');
+
+// Form instance.
+$form = new \local_coursessms\form\send_form(
+    new moodle_url('/local/coursessms/send_action.php'),
+    ['courseid' => $courseid]
+);
+
+// Handle cancel action.
+if ($form->is_cancelled()) {
+    redirect(new moodle_url('/course/view.php', ['id' => $courseid]));
+}
 
 // Display the form.
 $form->display();
